@@ -1,0 +1,15 @@
+apply plugin: 'java'
+
+// Basic Properties
+sourceCompatibility = 1.6
+targetCompatibility = '1.6'
+
+version = '0.1'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+	compile fileTree(dir: 'libs', include: '*.jar')
+}
