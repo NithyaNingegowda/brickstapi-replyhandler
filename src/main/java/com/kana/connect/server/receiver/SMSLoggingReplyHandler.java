@@ -9,7 +9,7 @@
 
 /* 
    NOTE: In Connect 10r4, custom reply handlers must be in the com.kana.connect.server.receiver package
-   because certain classes, likek ReceiverMessage are not exported outside this package.
+   because certain classes, like ReceiverMessage are not exported outside this package.
    */
 
 package com.kana.connect.server.receiver;
