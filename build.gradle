@@ -12,4 +12,6 @@ repositories {
 
 dependencies {
 	compile fileTree(dir: 'libs', include: '*.jar')
+	compile 'javax.jms:jms-api:1.1-rev-1'
+
 }

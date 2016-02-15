@@ -1,5 +1,7 @@
-To compile this sample, copy the following jar files from the Connect
-distribution:
+To compile this sample, copy the following jar files from the Connect distribution:
 
-	connect.jar
-	message-engine-1.0.jar
+kc/connect.jar
+
+kc/import/message-engine-1.0.jar
+
+Then run 'mvn compile' or 'gradle compileJava'
