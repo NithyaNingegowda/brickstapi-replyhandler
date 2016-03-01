@@ -11,7 +11,16 @@ To Build:
 
 	gradle jar
 
-This will produce connect.replyhandler-0.1.jar in build/libs.
+   This will produce connect.replyhandler-0.1.jar in build/libs.
+
+   Alternatively, you can build using maven:
+        mvn package
+
+	To build without tests:
+
+	mvn -Dmaven.test.skip=true package
+
+	This will build a jar in the target directory.
 
 
 To install:
@@ -19,6 +28,7 @@ To install:
 Copy the jar file to the kc/import directory.
 
 Edit the connect.properties file to add the jar file to the classpath.
+
 
 If on a deployed node, restart the Connect service to force the new classpath to be used.
 

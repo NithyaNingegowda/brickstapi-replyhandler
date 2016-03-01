@@ -26,10 +26,14 @@ import com.kana.connect.server.smpp.Address;
 import com.kana.connect.server.smpp.message.SMPPRequest;
 
 import net.brickst.connect.custom.content.XslContent;
+import net.brickst.connect.custom.webservices.JMSEndpoint;
+import net.brickst.connect.custom.webservices.LogEndpoint;
+import net.brickst.connect.custom.webservices.RESTEndpoint;
 import net.brickst.connect.custom.webservices.WebEndpoint;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.text.MessageFormat;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +64,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	private static ConcurrentHashMap<String, Integer> numberMappings;
 	private static XslContent contentTemplate;
 	private static AtomicBoolean didInit;
+	private static int returnValueForMatch;
 	
 	public SMSKeywordDispatchReplyHandler() {
 		// The constructor can be used for handler-specific initialiation.
@@ -70,6 +75,42 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	public static WebEndpoint[] getWebEndpoints() { return webEndpoints; }
 	public static Integer getNumberMapping(String number) { return numberMappings.get(number); }
 	
+	//
+	// logging methods
+	//
+	
+	protected static void log(Debug logger, String pattern, Object... arguments)
+    {
+        if (logger.isEnabled()) {
+            String msg = pattern;
+            if (arguments.length > 0) {
+                msg = MessageFormat.format(pattern, arguments);
+            }
+            logger.println(msg);
+        }
+    }
+
+	protected static void log(String pattern, Object... arguments)
+    {
+        log(Debug.SR, pattern, arguments);
+    }
+
+    protected static void logException(Debug logger, Throwable th, String pattern, Object... arguments)
+    {
+        if (logger.isEnabled()) {
+            String msg = pattern;
+            if (arguments.length > 0) {
+                msg = MessageFormat.format(pattern, arguments);
+            }
+            logger.printException(th, msg);
+        }
+    }
+
+    protected static void logException(Throwable th, String pattern, Object... arguments)
+    {
+        logException(Debug.SR, th, pattern, arguments);
+    }
+    
 	protected static int getIntProperty(Properties props, String propName, int defaultVal)
 	{
 		String val = props.getProperty(propName);
@@ -78,7 +119,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			ival = Integer.parseInt(val);
 			return ival;
 		} catch (Exception x) {
-			// log exception
+			logException(x, "Error parsing " + propName + "=" + val);
 			return defaultVal;
 		}
 	}
@@ -101,14 +142,14 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			FileInputStream propsInput = null;
 			try {
 				propsInput = new FileInputStream(configProps);
-			} catch (Exception x) {
-				// TODO LOG EXCEPTION
-				throw new IllegalArgumentException("Unable to find "
-						+ configProps, x);
+			} 
+			catch (Exception x) {
+				throw new IllegalArgumentException("Unable to find " + configProps, x);
 			}
 			try {
 				props.load(propsInput);
-			} catch (Exception x) {
+			} 
+			catch (Exception x) {
 				throw new RuntimeException(x);
 			}
 
@@ -150,23 +191,38 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			int endpointCount = getIntProperty(props, "endpoint_count", 0);
 			webEndpoints = new WebEndpoint[endpointCount];
 			for (int i = 0; i < endpointCount; i++) {
-				WebEndpoint wep = new WebEndpoint();
+				WebEndpoint wep = null;
 				String epPrefix = "endpoint_" + i + ".";
 				String epName = epPrefix + "type";
 				String epType = props.getProperty(epName);
 				if ("JMS".equalsIgnoreCase(epType)) {
-					wep.initJmsFromProperties(props, epPrefix);
-				} 
+				    wep = new JMSEndpoint();
+				}
 				else if ("REST".equalsIgnoreCase(epType)) {
-					wep.initRestFromProperties(props, epPrefix);
+					wep = new RESTEndpoint();
 				}
 				else if ("LOG".equalsIgnoreCase(epType)) {
-					wep.initLogFromProperties(props, epPrefix);
-				} 
-				else {
-					throw new IllegalArgumentException(
-							"Invalid endpoint type: " + epType);
+				    wep = new LogEndpoint();
 				}
+				else if ("CUSTOM".equalsIgnoreCase(epType)) {
+				    String endpointClassName = props.getProperty(epPrefix + "className");
+				    if (endpointClassName == null) {
+				        throw new IllegalArgumentException("CUSTOM endpoint must have className property");
+				    }
+				    try {
+				        wep = (WebEndpoint) Class.forName(endpointClassName).newInstance();
+				    }
+				    catch (Exception x) {
+				        throw new IllegalArgumentException("bad className:" + endpointClassName, x);
+				    }
+				}
+                else {
+                    throw new IllegalArgumentException(
+                            "Invalid endpoint type: " + epType);
+                }
+
+				// got endpoint, now do init 
+				wep.initFromProperties(props, epPrefix);
 
 				// init retry dir
 				File retry = new File(WebEndpoint.getTopLevelRetryDir(),
@@ -178,6 +234,9 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 						+ "retryIntervalSeconds", 300); // default 5 mins
 				wep.setRetryIntervalMS(retryIntervalSec * 1000);
 
+				// start retry task
+				wep.startRetryTask();
+				
 				webEndpoints[i] = wep;
 			}
 
@@ -209,6 +268,29 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 				throw new IllegalArgumentException("Invalid Content Type: " + contentType);
 			}
 			
+			//
+			// return value
+			//
+			String returnVal = props.getProperty("return_value");
+			if (returnVal == null || returnVal.trim().length() == 0) {
+			    returnValueForMatch = HANDLED;
+			}
+			else {
+			    try {
+			        int propVal = Integer.parseInt(returnVal);
+			        // only accept valid values for return_val
+			        if (propVal >= 1 && propVal <= 3) {
+			            returnValueForMatch = propVal;
+			        }
+			        else {
+			            throw new IllegalArgumentException("Invalid return_value; must be 1-3");
+			        }
+			    }
+			    catch (NumberFormatException x) {
+                    throw new IllegalArgumentException("Cannot parse return_value: " + returnVal);
+			    }
+			}
+			
 			// did load, need to init
 			return true;
 		}
@@ -225,7 +307,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		
 		int endpointCount = webEndpoints.length;
 		for (int i = 0; i < endpointCount; i++) {
-			WebEndpoint wep = new WebEndpoint();
+			WebEndpoint wep = webEndpoints[i];
 			wep.initNetworkResources();
 		}
 		
@@ -389,12 +471,11 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			try {
 				wep.scheduleRetry(xslOutput);
 
-				// to return HANDLED or HANDLED_CONTINUE...
 				// each handler must set msg result codes
 				msg.setHandlerID(getHandlerID());
 				msg.setHandleType(getHandleType());
-				msg.setHandleCode(HANDLED);
-				return HANDLED; // or HANDLED_CONTINUE
+				msg.setHandleCode(returnValueForMatch);
+				return returnValueForMatch; 
 			} catch (Throwable th) {
 				// TODO log exception
 
@@ -406,25 +487,21 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		}
 
 		//
-		// If the handler returns HANDLED, then other reply handlers WILL NOT
-		// run.
-		// If the handler returns HANDLED_CONTINUE, then other reply handler
-		// WILL run.
+		// If the handler returns HANDLED, then other reply handlers WILL NOT run.
+		// If the handler returns HANDLED_CONTINUE, then other reply handler WILL run.
 		// Archiving and redirecting WILL occur if the handler returns HANDLED
 		// or HANDLED_CONTINUE.
 		//
-		// If the handler returns NOT_HANDLED, then other reply handlers WILL
-		// run.
-		// Archiving and redirecting WILL NOT occur if the handler returns
-		// NOT_HANDLED.
+		// If the handler returns NOT_HANDLED, then other reply handlers WILL run. 
+		// Archiving and redirecting WILL NOT occur if the handler returns NOT_HANDLED.
 		//
 
 		// to return HANDLED or HANDLED_CONTINUE...
 		// each handler must set msg result codes
 		msg.setHandlerID(getHandlerID());
 		msg.setHandleType(getHandleType());
-		msg.setHandleCode(HANDLED);
-		return HANDLED; // or HANDLED_CONTINUE
+		msg.setHandleCode(returnValueForMatch);
+		return returnValueForMatch; 
 	}
 
 }

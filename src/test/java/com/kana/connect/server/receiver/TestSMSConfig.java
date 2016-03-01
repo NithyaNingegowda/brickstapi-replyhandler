@@ -6,7 +6,10 @@ import java.util.regex.Pattern;
 import org.junit.Assert;
 import org.junit.Test;
 
+import net.brickst.connect.custom.webservices.JMSEndpoint;
+import net.brickst.connect.custom.webservices.LogEndpoint;
 import net.brickst.connect.custom.webservices.WebEndpoint;
+import net.brickst.connect.custom.webservices.WebEndpoint.EndpointType;
 
 
 public class TestSMSConfig 
@@ -26,9 +29,15 @@ public class TestSMSConfig
 		// check web endpoints
 		WebEndpoint[] endpoints = SMSKeywordDispatchReplyHandler.getWebEndpoints();
 		Assert.assertEquals(1, endpoints.length);
-		WebEndpoint wep = endpoints[0];
-		Assert.assertEquals("com.ibm.mq.jms.context.WMQInitialContextFactory", wep.getJndiInitialContextFactory());
-		
+		WebEndpoint endpoint = endpoints[0];
+		if (endpoint.getEndpointType() == EndpointType.JMS) {
+		    JMSEndpoint wep = (JMSEndpoint) endpoints[0];
+		    Assert.assertEquals("com.ibm.mq.jms.context.WMQInitialContextFactory", wep.getJndiInitialContextFactory());
+		}
+		else if (endpoint.getEndpointType() == EndpointType.LOG) {
+		    LogEndpoint lep = (LogEndpoint) endpoints[0];
+		    Assert.assertEquals(0.01, lep.getFailPercentage(), 0.01);		    
+		}
 		// check number mappings
 		Integer wepNumber = SMSKeywordDispatchReplyHandler.getNumberMapping("16035151212");
 		Assert.assertEquals(0, wepNumber.intValue());
