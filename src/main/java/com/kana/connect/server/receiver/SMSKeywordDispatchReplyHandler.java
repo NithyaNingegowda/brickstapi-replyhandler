@@ -63,7 +63,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	private static WebEndpoint[] webEndpoints;
 	private static ConcurrentHashMap<String, Integer> numberMappings;
 	private static XslContent contentTemplate;
-	private static AtomicBoolean didInit;
+	private static AtomicBoolean didInit = new AtomicBoolean();
 	private static int returnValueForMatch;
 	
 	public SMSKeywordDispatchReplyHandler() {
@@ -114,6 +114,10 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	protected static int getIntProperty(Properties props, String propName, int defaultVal)
 	{
 		String val = props.getProperty(propName);
+		if (val == null) {
+		    return defaultVal;
+		}
+
 		int ival;
 		try {
 			ival = Integer.parseInt(val);
@@ -172,6 +176,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 				} catch (Throwable th) {
 					throw new RuntimeException("Error compiling regex " + i, th);
 				}
+				log(Debug.SRV, "SMSKeywordDispatch: got pattern " + regex);
 				matchPatterns[i] = p;
 			}
 
@@ -184,6 +189,12 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			}
 			File retryTop = new File(endpointRetryDir);
 			WebEndpoint.setTopLevelRetryDir(retryTop);
+			try {
+			    log(Debug.SRV, "SMSKeywordDispatch: retry dir: {0}", retryTop.getCanonicalPath());
+			}
+			catch (Exception x) {
+			    ; //ignore
+			}
 
 			//
 			// load endpoints
@@ -236,6 +247,8 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 
 				// start retry task
 				wep.startRetryTask();
+
+				log(Debug.SRV, "SMSKeywordDispatch: endpoint " + i + ": " + wep);
 				
 				webEndpoints[i] = wep;
 			}
@@ -254,6 +267,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 							"Invalid endpoint in mapping " + i);
 				}
 				numberMappings.put(number, Integer.valueOf(epNumber));
+				log(Debug.SRV, "SMSKeywordDispatch: Map endpoint " + number + " -> " + epNumber);
 			}
 
 			//
@@ -372,18 +386,15 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	 * the incoming message and take action based on the message content.
 	 */
 	public int handle(SmppReceiverMessage msg, TransactionManager tm) {
-		// print log message to MailProcessor log under the "SMPP Receiver"
-		// Diagnostic
-		if (Debug.SR.isEnabled()) {
-			Debug.SR.println("SMSKeywordDispatchReplyHandler: attempting to handle: "
-					+ msg);
-		}
+	    // print log message to MailProcessor log under the "SMPP Receiver" Verbose Diagnostic
+	    log(Debug.SRV, "SMSKeywordDispatch: attempting to handle: {0}", msg);
 
 		// extract info about the incoming message from the SmppReceiverMessage
 		// object
 		String smsSource = msg.getFieldToMatch("from");
 		String smsDest = msg.getFieldToMatch("to");
 		String smsMessage = msg.getFieldToMatch("body");
+		log(Debug.SRVV, "SMSKeywordDispatch: src: {0} dst:{1} msg:{2}", smsSource, smsDest, smsMessage);
 
 		//
 		// MATCH INCOMING MESSAGE AGAINST REGEXES
@@ -398,6 +409,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 			Pattern pattern = matchPatterns[i];
 			Matcher matcher = pattern.matcher(smsMessage);
 			if (matcher.matches()) {
+			    log(Debug.SRVV, "SMSKeywordDispatch: match {0}", pattern.pattern());
 				matchIndex = i;
 				matchMatcher = matcher;
 				break;
@@ -406,6 +418,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 
 		// quit if no match
 		if (matchIndex < 0) {
+		    log(Debug.SRVV, "SMSKeywordDispatch: no match");
 			return NOT_HANDLED; // NOT_HANDLED is inherited from parent class
 		}
 
@@ -415,11 +428,13 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		Integer targetEndpoint = numberMappings.get(smsDest);
 		if (targetEndpoint == null) {
 			// no match for destination number; log and give up???
+		    log(Debug.SR, "SMSKeywordDispatch: WARNING: no endpoint for dest: {0}", smsDest);
 			return NOT_HANDLED;
 		}
 		WebEndpoint wep = webEndpoints[targetEndpoint.intValue()];
 		if (wep == null) {
 			// no match for endpoint number; log and give up???
+		    log(Debug.SR, "SMSKeywordDispatch: WARNING: no endpoint for target: {0}", targetEndpoint);
 			return NOT_HANDLED;
 		}
 
@@ -445,6 +460,8 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 
 		// create xml doc
 		String xmlContent = smppToXml(msg);
+		log(Debug.SRV, "SMSKeywordDispatch: XML: {0}", xmlContent);
+
 		String xslOutput = null;
 		// do xsl transform 
 		if (contentTemplate == null) {
@@ -458,13 +475,17 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 				throw new RuntimeException(th);
 			}
 		}
+		log(Debug.SRV, "SMSKeywordDispatch: XSL Output: {0}", xslOutput);
 
 		//
 		// DELIVER MESSAGE TO ENDPOINT
 		//
 		try {
 			wep.deliverMessage(xslOutput);
+			log(Debug.SR, "SMSKeywordDispatch: delivered to {0}" + wep);
 		} catch (Exception x) {
+		    logException(x, "SMSKeywordDispatch: reshedule delivery to {0}", wep);
+			
 			//
 			// TODO LOG EXCEPTION
 			//
@@ -478,6 +499,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 				return returnValueForMatch; 
 			} catch (Throwable th) {
 				// TODO log exception
+			    logException(x, "SMSKeywordDispatch: RESHEDULE FAILURE to {0}", wep);
 
 				// If we cannot deliver the message and we cannot save to a
 				// file,
