@@ -40,8 +40,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 
 public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 	// The mail processor may create a new handler object for each incoming
@@ -340,17 +343,33 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		initNetworkResources();
 	}
 	
+	private static String fillRight(String str, int len, char cc)
+	{
+	    StringBuffer buf = new StringBuffer(str);
+	    
+	    if (buf.length() >= len) {
+	        buf.append(cc);
+	        return buf.toString();
+	    }
+	    
+	    for (int i = buf.length(); i < len; i++) {
+	        buf.append(cc);
+	    }
+	    return buf.toString();
+	}
+	
 	/**
 	 * Helper method that transforms an SMPP Message into an XML document
 	 */
-	public String smppToXml(SmppReceiverMessage msg)
+	public static String smppToXml(SmppReceiverMessage msg)
 	{
 		SMPPRequest smppReq = msg.getSmppRequest();
 		
 		StringBuffer buf = new StringBuffer();
 		buf.append("<smpp>\n");
 
-		// smpp header
+		// smpp header 
+		// numeric values do not need to be escaped
 		buf.append("<header>");
 		buf.append("<command_id>").append(smppReq.getCommandId()).append("</command_id>");
 		buf.append("<sequence_number>").append(smppReq.getSequenceNum()).append("</sequence_number>");
@@ -361,7 +380,11 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		buf.append("<source>");
 		buf.append("<ton>").append(smppSource.getTON()).append("</ton>");
 		buf.append("<npi>").append(smppSource.getNPI()).append("</npi>");
-		buf.append("<address>").append(smppSource.getAddress()).append("</address>");
+		
+		String srcAddr = smppSource.getAddress();
+		srcAddr = StringEscapeUtils.escapeXml11(srcAddr);
+		String filledSrcAddr = fillRight(srcAddr, 20, ' ');
+		buf.append("<address>").append(filledSrcAddr).append("</address>");
 		buf.append("</source>\n");
 		
 		// smpp dest
@@ -369,14 +392,53 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		buf.append("<destination>");
 		buf.append("<ton>").append(smppDest.getTON()).append("</ton>");
 		buf.append("<npi>").append(smppDest.getNPI()).append("</npi>");
-		buf.append("<address>").append(smppDest.getAddress()).append("</address>");
+		
+		String dstAddr = smppDest.getAddress();
+		dstAddr = StringEscapeUtils.escapeXml11(dstAddr);
+		String filledDstAddr = fillRight(dstAddr, 20, ' ');
+		buf.append("<address>").append(filledDstAddr).append("</address>");
 		buf.append("</destination>\n");
+
+		// message id
+		String msgId = smppReq.getMessageId();
+		if (msgId == null) {
+		    msgId = "";
+		}
+		msgId = StringEscapeUtils.escapeXml11(msgId);
+		String filledMsgId = fillRight(msgId, 65, ' ');
+		buf.append("<messageid>").append(filledMsgId).append("</messageid>\n");
 		
 		// smpp message
+		String msgText = smppReq.getMessageText();
+		msgText = StringEscapeUtils.escapeXml11(msgText);
 		buf.append("<message>");
-		buf.append(smppReq.getMessageText());
+		buf.append(msgText);
 		buf.append("</message>\n");
 
+		// base64 message
+        msgText = smppReq.getMessageText();
+        msgText = Base64.encodeBase64String(msgText.getBytes());
+        buf.append("<messageBase64>");
+        buf.append(msgText);
+        buf.append("</messageBase64>\n");
+		
+        //
+        // timestamps in different formats
+        //
+        
+        long now = System.currentTimeMillis();
+        
+        DateTimeFormatter isoFormat = DateTimeFormat.forPattern("YYYY-MM-dd'T'HH:mm:ss.SSSSSZZ");
+        String headerTimestamp = isoFormat.print(now);
+        headerTimestamp = StringEscapeUtils.escapeXml11(headerTimestamp);
+        
+        DateTimeFormatter otherFormat = DateTimeFormat.forPattern("ddMMYYYYHHmmZZZ");
+        String payloadTimestamp = otherFormat.print(now);
+        payloadTimestamp = StringEscapeUtils.escapeXml11(payloadTimestamp);
+		
+        buf.append("<headertimestamp>").append(headerTimestamp).append("</headertimestamp>");
+        buf.append("<payloadtimestamp>").append(payloadTimestamp).append("</payloadtimestamp>");
+        
 		buf.append("</smpp>\n");
 		return buf.toString();
 	}
