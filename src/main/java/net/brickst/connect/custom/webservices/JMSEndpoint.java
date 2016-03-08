@@ -1,6 +1,5 @@
 package net.brickst.connect.custom.webservices;
 
-import java.io.IOException;
 import java.util.Hashtable;
 import java.util.Properties;
 
@@ -109,14 +108,23 @@ public class JMSEndpoint extends WebEndpoint
         jmsSendQueueName = value;
     }
 
-    // JMS connection factory (cannot set)
+    // message factory
+    public JMSMessageFactory getJmsMessageFactory() { return jmsMessageFactory; }
+    public void setJmsMessageFactory(JMSMessageFactory val) { jmsMessageFactory = val; }
+    
+    // JMS connection factory 
     public ConnectionFactory getJmsConnectionFactory() {
         return jmsConnectionFactory;
     }
-
+ 
     // JMS connection (cannot set)
     public Connection getJmsConnection() {
         return jmsConnection;
+    }
+    
+    // JMS Queue
+    public Queue getJmsQueue() {
+        return jmsSendQueue;
     }
 
     /**
@@ -268,6 +276,15 @@ public class JMSEndpoint extends WebEndpoint
         } else {
             jmsConn = cf.createConnection();
         }
+        jmsConnection = jmsConn;
+
+        // init jms message factory if necessary
+        if (jmsMessageFactory == null) {
+            jmsMessageFactory = new JMSTextMessageFactory();
+        }
+
+        // must call start to get messages flowing
+        jmsConnection.start();        
     }
 
     /**
