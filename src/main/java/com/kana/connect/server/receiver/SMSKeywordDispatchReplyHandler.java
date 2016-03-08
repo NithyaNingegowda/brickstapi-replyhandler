@@ -47,12 +47,9 @@ import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
 public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
-	// The mail processor may create a new handler object for each incoming
-	// message.
-	// On the other hand, the configuration for this handler is heavy and
-	// expensive to set up.
-	// As a result, we store the configuration in static variables so that it
-	// can be
+	// The mail processor may create a new handler object for each incoming message.
+	// On the other hand, the configuration for this handler is heavy and expensive to set up.
+	// As a result, we store the configuration in static variables so that it can be
 	// shared across multiple instances of the reply handler.
 	//
 	// If the config file changes, the mail processor needs to be restarted.
@@ -383,8 +380,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		
 		String srcAddr = smppSource.getAddress();
 		srcAddr = StringEscapeUtils.escapeXml11(srcAddr);
-		String filledSrcAddr = fillRight(srcAddr, 20, ' ');
-		buf.append("<address>").append(filledSrcAddr).append("</address>");
+		buf.append("<address>").append(srcAddr).append("</address>");
 		buf.append("</source>\n");
 		
 		// smpp dest
@@ -395,8 +391,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		
 		String dstAddr = smppDest.getAddress();
 		dstAddr = StringEscapeUtils.escapeXml11(dstAddr);
-		String filledDstAddr = fillRight(dstAddr, 20, ' ');
-		buf.append("<address>").append(filledDstAddr).append("</address>");
+		buf.append("<address>").append(dstAddr).append("</address>");
 		buf.append("</destination>\n");
 
 		// message id
@@ -405,8 +400,7 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
 		    msgId = "";
 		}
 		msgId = StringEscapeUtils.escapeXml11(msgId);
-		String filledMsgId = fillRight(msgId, 65, ' ');
-		buf.append("<messageid>").append(filledMsgId).append("</messageid>\n");
+		buf.append("<messageid>").append(msgId).append("</messageid>\n");
 		
 		// smpp message
 		String msgText = smppReq.getMessageText();
@@ -428,11 +422,14 @@ public class SMSKeywordDispatchReplyHandler extends SmppReplyHandler {
         
         long now = System.currentTimeMillis();
         
-        DateTimeFormatter isoFormat = DateTimeFormat.forPattern("YYYY-MM-dd'T'HH:mm:ss.SSSSSZZ");
+        // ISO8601 http://joda-time.sourceforge.net/apidocs/org/joda/time/format/ISODateTimeFormat.html
+        DateTimeFormatter isoFormat = ISODateTimeFormat.dateTime();
+        isoFormat.withZoneUTC();
         String headerTimestamp = isoFormat.print(now);
         headerTimestamp = StringEscapeUtils.escapeXml11(headerTimestamp);
         
-        DateTimeFormatter otherFormat = DateTimeFormat.forPattern("ddMMYYYYHHmmZZZ");
+        // custom format http://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html
+        DateTimeFormatter otherFormat = DateTimeFormat.forPattern("ddMMYYYYHHmmz");
         String payloadTimestamp = otherFormat.print(now);
         payloadTimestamp = StringEscapeUtils.escapeXml11(payloadTimestamp);
 		
