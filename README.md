@@ -31,22 +31,24 @@ To install:
 
     insert into reply_handler_master
     (
-    reply_handler_id, company_id, name, 
-    class_name, 
-    handle_type_code, source_code, status_code, 
-    scope_code, handle_order, 
-    insert_datetime, insert_process, insert_user, 
-    update_datetime, update_process, update_user, 
-    apply_to)
+        reply_handler_id, company_id, name, 
+        class_name, 
+        handle_type_code, source_code, status_code, 
+        scope_code, handle_order, 
+        insert_datetime, insert_process, insert_user, 
+        update_datetime, update_process, update_user, 
+        apply_to
+    )
     values
     (    
-    seq_reply_handler_id.nextval, 100, 'smskeyworddispatch',
-    'com.kana.connect.server.receiver.SMSKeywordDispatchReplyHandler',
-    101, 0, 0,
-    2, 3, 
-    sysdate, 'CE', 100, 
-    sysdate, 'CE', 100,
-    3);
+        seq_reply_handler_id.nextval, 100, 'smskeyworddispatch',
+        'com.kana.connect.server.receiver.SMSKeywordDispatchReplyHandler',
+        101, 0, 0,
+        2, 3, 
+        sysdate, 'CE', 100, 
+        sysdate, 'CE', 100,
+        3
+    );
 
 * handle_type_code can be anything
 * source_code and status_code are unused and should be 0
