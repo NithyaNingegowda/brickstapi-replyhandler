@@ -1,0 +1,102 @@
+TESTING NOTES
+
+1. Build reply handler with 'mvn -Dmaven.test.skip=true package'
+   ConnectReplyHandlers-1.0-SNAPSHOT-jar-with-dependencies.jar ("jar file") will be built in target folder.
+
+2. On Connect inside node, create import.ext folder and copy the jar file here.
+
+3. Create import.ibm folder and copy IBM MQ jars here.
+
+4. Edit crm.env to have this classpath:
+
+CLASSPATH=${KCHOME}:${KCHOME}/connect.jar:${KCHOME}/import/brickstlicense.jar:${KCHOME}/import/message-engine-1.0.jar:${KCHOME}/import/commons-beanutils.jar:${KCHOME}/import/commons-logging.jar:${KCHOME}/import/commons-io-1.4.jar:${KCHOME}/import/mail.jar:${KCHOME}/import/commons-net-1.4.1.jar:${KCHOME}/import/oromatcher.jar:${KCHOME}/import/servlet.jar:${KCHOME}/import/edtftpj-pro.jar:${KCHOME}/import/db2jcc_license_cu.jar:${KCHOME}/dev/jars/j2ee.jar:${KCHOME}/import/saxon9.jar:${KCHOME}/import/saxon9-s9api.jar:${KCHOME}/import/encodings.jar:${KCHOME}/import/saxon9-dom.jar:${KCHOME}/import/bcprov-jdk16-145.jar:${KCHOME}/import/groovy-all-1.7.6.jar:${KCHOME}/import/sqljdbc4.jar:${KCHOME}/import/ojdbc6.jar:${KCHOME}/import/orai18n.jar:${KCHOME}/import/mysql-connector-java-5.1.13-bin.jar:${KCHOME}/import/senders.jar:${KCHOME}/import/web_compact.jar:${KCHOME}/import/velocity-1.7-dep.jar:${KCHOME}/import/javatuples-1.2.jar:${KCHOME}/import/commons-lang-2.4.jar:${KCHOME}/import.ext/ConnectReplyHandlers-1.0-SNAPSHOT-jar-with-dependencies.jar:${KCHOME}/import.ibm/com.ibm.jaxws.thinclient_7.0.0.jar:${KCHOME}/import.ibm/com.ibm.mq.commonservices.jar:${KCHOME}/import.ibm/com.ibm.mq.headers.jar:${KCHOME}/import.ibm/com.ibm.mq.jar:${KCHOME}/import.ibm/com.ibm.mq.jmqi.jar:${KCHOME}/import.ibm/com.ibm.mq.jmqi.remote.jar:${KCHOME}/import.ibm/com.ibm.mq.jmqi.system.jar:${KCHOME}/import.ibm/com.ibm.mqjms.jar:${KCHOME}/import.ibm/com.ibm.msg.client.commonservices.j2se.jar:${KCHOME}/import.ibm/com.ibm.msg.client.commonservices.jar:${KCHOME}/import.ibm/com.ibm.msg.client.jms.internal.jar:${KCHOME}/import.ibm/com.ibm.msg.client.jms.jar:${KCHOME}/import.ibm/com.ibm.msg.client.provider.jar:${KCHOME}/import.ibm/com.ibm.msg.client.wmq.common.jar:${KCHOME}/import.ibm/com.ibm.msg.client.wmq.factories.jar:${KCHOME}/import.ibm/com.ibm.msg.client.wmq.jar:${KCHOME}/import.ibm/com.ibm.ws.admin.client_7.0.0.jar:${KCHOME}/import.ibm/com.ibm.ws.ejb.thinclient_7.0.0.jar:${KCHOME}/import.ibm/com.ibm.ws.orb_7.0.0.jar:${KCHOME}/import.ibm/com.ibm.ws.runtime.jar:${KCHOME}/import.ibm/com.ibm.ws.sib.client.thin.jms_7.0.0.jar:${KCHOME}/import.ibm/com.ibm.ws.sib.server.jar:${KCHOME}/import.ibm/dhbcore.jar:${KCHOME}/import.ibm/ibmkeycert.jar:${KCHOME}/import.ibm/ibmpkcs.jar
+
+5. Register reply handler in db:
+
+       insert into reply_handler_master
+    (
+        reply_handler_id, company_id, name, 
+        class_name, 
+        handle_type_code, source_code, status_code, 
+        scope_code, handle_order, 
+        insert_datetime, insert_process, insert_user, 
+        update_datetime, update_process, update_user, 
+        apply_to
+    )
+    values
+    (    
+        seq_reply_handler_id.nextval, 100, 'smskeyworddispatch',
+        'com.kana.connect.server.receiver.SMSKeywordDispatchReplyHandler',
+        101, 0, 0,
+        2, 3, 
+        sysdate, 'CE', 100, 
+        sysdate, 'CE', 100,
+        3
+    );
+
+   Since the name is 'smskeyworddispatch', it will look for 
+   a file named smskeyworddispatch.properties in the kc directory.
+
+6. Create smskeyworddispatch.properties:
+
+   # regex
+   regex_count=1
+   regex_0.pattern=.*
+   # endpoints
+   endpoint_retrydir=smsretryqueue
+   endpoint_count=1
+   # SAMPLE JMS ENDPOINT
+   endpoint_0.type=JMS
+   endpoint_0.jmsJndiClass=com.ibm.websphere.naming.WsnInitialContextFactory
+   endpoint_0.jmsJndiUrl=iiop://10.101.0.101:2809
+   endpoint_0.jmsConnectionFactoryName=jms/cellQueueConnectionFactory
+   endpoint_0.jmsSendQueueName=jms/cellRequestQueue
+   ## provider class to take data and produce a JMS message object
+   endpoint_0.jmsMessageFactory=net.brickst.connect.custom.webservices.JMSTextMessageFactory
+   endpoint_0.retryIntervalSeconds=30
+   #
+   # mappings from phone numbers to endpoints
+   #
+   mapping_count=1
+   mapping_0.number=16035551212
+   mapping_0.endpoint=0
+   #
+   # content
+   #
+   content.type=XSL
+   content.url=http://content.brickst.net/sms2waysoap1.xsl
+   #
+   # return value for matches
+   #
+   return_value=3
+
+7. Test with smppsim: http://www.seleniumsoftware.com/downloads.html
+
+   In Connect, configure an SMPP server that points to SMPPSim.  Hostname, port,
+   username, and password should be the same as the smppsim properties file.
+
+   In the properties file, set DELIVERY_MESSAGES_PER_MIN=300 (or whatever value you want).
+   When this parameter is >0, smppsim will send this many mobile-originated messages per 
+   minute to Connect.  You should also specify a DELIVER_MESSAGES_FILE which is a csv file
+   that contains the messages to submit.  The format is:
+
+   source number,dest number,message
+ 
+   For details, see the docs: http://www.seleniumsoftware.com/user-guide.htm#mo
+
+   In Connect, the MailProcessor log will contain a trace of incoming messages if the SMPP Receiver
+   diagnostic is enabled:
+
+   02:06:55.281 [MailProcessor$SMPPProcessorThread-16] SR: SMSLoggingReplyHandler: message from 16032650475 (customer:184) to 16035551212 body:"This is a test 6"
+   02:06:55.307 [MailProcessor$SMPPProcessorThread-16] SR: SMSKeywordDispatch: delivered to {0}net.brickst.connect.custom.webservices.JMSEndpoint@5a388c74
+
+8. Debugging WAS / MQ Connection problems
+
+   Add these args to java command line:
+
+   -Dcom.ibm.ejs.ras.lite.traceSpecification=*=all
+   -Dcom.ibm.CORBA.Debug=true 
+   -Dcom.ibm.CORBA.CommTrace=true
+   -Dcom.ibm.CORBA.Debug.Output=corbaclient.log
+  
+   See: http://www.ibm.com/support/knowledgecenter/SSEQTP_7.0.0/com.ibm.websphere.base.iseries.doc/info/iseries/ae/tcli_ejbthinclient.html
