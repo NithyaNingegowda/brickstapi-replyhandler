@@ -1,0 +1,7 @@
+net\brickst\connect\custom\webservices\TestLogEndpoint.class
+com\kana\connect\server\receiver\TestRegex.class
+net\brickst\connect\custom\content\TestXslContent.class
+net\brickst\connect\custom\webservices\LogEndpointStressTest.class
+net\brickst\connect\custom\webservices\TestJMSEndpoint.class
+com\kana\connect\server\receiver\TestSMSConfig.class
+net\brickst\connect\custom\webservices\LogEndpointStressTest$LogMonitor.class

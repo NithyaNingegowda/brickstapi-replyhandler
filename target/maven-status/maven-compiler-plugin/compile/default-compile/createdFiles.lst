@@ -1,0 +1,13 @@
+com\kana\connect\server\receiver\SMSKeywordDispatchReplyHandler.class
+net\brickst\connect\custom\webservices\WebEndpoint$EndpointType.class
+com\kana\connect\server\receiver\SMSLoggingReplyHandler.class
+net\brickst\connect\custom\webservices\WebEndpoint.class
+net\brickst\connect\custom\webservices\LogEndpoint.class
+com\kana\connect\server\receiver\EmailLoggingReplyHandler.class
+net\brickst\connect\custom\webservices\JMSTextMessageFactory.class
+net\brickst\connect\custom\webservices\WebEndpoint$RetryTimerTask.class
+net\brickst\connect\custom\webservices\RESTEndpoint.class
+net\brickst\connect\custom\webservices\JMSMessageFactory.class
+net\brickst\connect\custom\content\XslContent.class
+net\brickst\connect\custom\webservices\JMSEndpoint.class
+net\brickst\connect\custom\webservices\LogEndpoint$LogObserver.class

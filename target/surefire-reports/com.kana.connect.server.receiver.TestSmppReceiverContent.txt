@@ -1,0 +1,8 @@
+-------------------------------------------------------------------------------
+Test set: com.kana.connect.server.receiver.TestSmppReceiverContent
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.23 sec <<< FAILURE! - in com.kana.connect.server.receiver.TestSmppReceiverContent
+testSoapMessage(com.kana.connect.server.receiver.TestSmppReceiverContent)  Time elapsed: 0.23 sec  <<< ERROR!
+java.lang.NullPointerException
+	at com.kana.connect.server.receiver.TestSmppReceiverContent.testSoapMessage(TestSmppReceiverContent.java:102)
+

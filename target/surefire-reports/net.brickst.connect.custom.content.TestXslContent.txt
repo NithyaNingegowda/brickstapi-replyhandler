@@ -1,0 +1,10 @@
+-------------------------------------------------------------------------------
+Test set: net.brickst.connect.custom.content.TestXslContent
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 25.797 sec <<< FAILURE! - in net.brickst.connect.custom.content.TestXslContent
+testXslContent(net.brickst.connect.custom.content.TestXslContent)  Time elapsed: 25.796 sec  <<< ERROR!
+java.lang.RuntimeException: java.net.SocketException: Connection reset
+	at net.brickst.connect.custom.content.TestXslContent.testXslContent(TestXslContent.java:19)
+Caused by: java.net.SocketException: Connection reset
+	at net.brickst.connect.custom.content.TestXslContent.testXslContent(TestXslContent.java:19)
+
